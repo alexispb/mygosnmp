@@ -1,0 +1,537 @@
+Based on RFC 2741.
+
+AgentX PDU (Protocol Data Unit) consist of a common header, followed by
+PDU-specific data (called payload) of variable length.
+
+Integer Values
+
+Integer32, Counter32, Gauge32, TimeTicks, and Counter64 are encoded as
+corresponding number of contiguous bytes. The order of bytes depends on
+the header's NETWORK_BYTE_ORDER bit: if set, then network byte order
+(most significant byte first; "big endian") is used; if not set, then
+least significant byte first ("little endian") is used.
+
+Octet String
+
+An octet string is represented by a contiguous series of bytes,
+beginning with a 4-byte integer (encoded according to the header's
+NETWORK_BYTE_ORDER bit) whose value is the number of octets in the
+octet string, followed by the octets themselves. If the last octet
+does not end on a 4-byte offset from the start of the Octet String,
+padding bytes are appended to achieve alignment of following data.
+This padding must be added even if the Octet String is the last
+item in the PDU. Padding bytes must be zero filled.
+
+IpAddress and Opaque are encoded as Octet String. Note that bytes
+used to represent IpAddress are always ordered most significant to
+least significant.
+
+Object Identifier
+
+An object identifier is encoded as a 4-byte header, followed by a
+variable number of contiguous 4-byte fields representing sub-
+identifiers:
+
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|    nsubid     |  prefix       |  include      |  <reserved>   |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                       sub-identifier #1                       |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                       sub-identifier #nsubid                  |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+Object Identifier header fields:
+
+* nsubid. The number (0-128) of sub-identifiers in the object
+  identifier. An ordered list of "n_subid" 4-byte sub-identifiers
+  follows the 4-byte header.
+
+* prefix. An unsigned value used to reduce the length of object
+  identifier encodings. A non-zero value "x" is interpreted as the
+  first sub-identifier after "internet" (1.3.6.1), and indicates an
+  implicit prefix "internet.x" to the actual sub-identifiers encoded
+  in the object identifier. E.g. a prefix field value 2 indicates an
+  implicit prefix "1.3.6.1.2". A value of 0 in the prefix field
+  indicates there is no prefix to the sub-identifiers.
+
+* include. Used only when the Object Identifier is the start of a
+  SearchRange.
+
+* sub-identifier 1, 2, ... nsubid. A 4-byte unsigned integer,
+  encoded according to the header's NETWORK_BYTE_ORDER bit.
+  A null Object Identifier consists of the 4-byte header with
+  all bytes set to 0.
+
+VarBind
+
+A varbind encoding consists of a 2-byte type field, a name (Object
+Identifier), and the actual value data.
+
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|           type                |          <reserved>           |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+(name)
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|   nsubid      |  prefix       |      0        |       0       |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                       sub-identifier #1                       |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                       sub-identifier #nsubid                  |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+(value data)
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                       data                                    |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                       data                                    |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* type. Indicates the varbind's syntax, and must be one of the
+  following values:
+
+    Integer           (2)
+    Octet String      (4)
+    Null              (5)
+    Object Identifier (6)
+    IpAddress         (64)
+    Counter32         (65)
+    Gauge32           (66)
+    TimeTicks         (67)
+    Opaque            (68)
+    Counter64         (70)
+    noSuchObject      (128)
+    noSuchInstance    (129)
+    endOfMibView      (130)
+
+* name.The Object Identifier which names the variable.
+
+* data. The actual value, encoded as described above. Null, noSuchObject,
+  noSuchInstance, and endOfMibView do not contain any encoded value:
+  value data never follows name in these cases.
+
+SearchRange
+
+A SearchRange consists of two Object Identifiers. In its
+communication with a subagent, the master agent uses a SearchRange
+to identify a requested variable binding, and, in GetNext and
+GetBulk operations, to set an upper bound on the names of managed
+object instances the subagent may send in reply.
+
+The first Object Identifier in a SearchRange (called the starting
+OID) indicates the beginning of the range. It is frequently (but not
+necessarily) the name of a requested variable binding. The "include"
+field in this OID's header is a boolean value (0 or 1) indicating
+whether or not the starting OID is included in the range.
+
+The second object identifier (ending OID) indicates the non-inclusive
+end of the range, and its "include" field is always 0. A null value
+for ending OID indicates an unbounded SearchRange.
+
+Protocol Data Unit (PDU)
+
+PDU encoding consists of PDU Header followed by PDU payload.
+
+PDU Header
+
+The PDU header is a fixed-format, 20-octet structure:
+
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|    version    |     type      |     flags     |  <reserved>   |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                           sessionID                           |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                         transactionID                         |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                           packetID                            |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                         payload_length                        |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* version. The version of the AgentX protocol (currently = 1).
+
+* type. The PDU type (also called PDU Tag); one of the following
+  values:
+
+  Open-PDU             (1),
+  Close-PDU            (2),
+  Register-PDU         (3),
+  Unregister-PDU       (4),
+  Get-PDU              (5),
+  GetNext-PDU          (6),
+  GetBulk-PDU          (7),
+  TestSet-PDU          (8),
+  CommitSet-PDU        (9),
+  UndoSet-PDU         (10),
+  CleanupSet-PDU      (11),
+  Notify-PDU          (12),
+  Ping-PDU            (13),
+  IndexAllocate-PDU   (14),
+  IndexDeallocate-PDU (15),
+  AddAgentCaps-PDU    (16),
+  RemoveAgentCaps-PDU (17),
+  Response-PDU        (18)
+
+* flags. A bitmask, with bit 0 the least significant bit.
+  The bit definitions are as follows:
+
+    Bit  Definition
+    ---  ----------
+    0    INSTANCE_REGISTRATION
+    1    NEW_INDEX
+    2    ANY_INDEX
+    3    NON_DEFAULT_CONTEXT
+    4    NETWORK_BYTE_ORDER
+    5-7  (reserved)
+
+    - The NETWORK_BYTE_ORDER bit applies to all multi-byte integer values
+      in the entire AgentX packet, including the remaining header fields.
+      If set, then network byte order (most significant byte first; "big
+      endian") is used. If not set, then least significant byte first
+      ("little endian") is used. This bit applies to all PDUs.
+    - The NON_DEFAULT_CONTEXT bit is used only within the Register-,
+      UnRegister-, AddAgentCaps-, RemoveAgentCaps-, Get-, GetNext-,
+      GetBulk-, IndexAllocate-, IndexDeallocate-, Notify-, TestSet-,
+      and Ping-PDUs. If this bit is set, then a context field immediately
+      follows the AgentX header (its value may be a zero-length Octet
+      String). If this bit is not set, then there is no context
+      field in the PDU (this does not mean there is a zero-length Octet
+      String, it means there is no Octet String present).
+    - The NEW_INDEX and ANY_INDEX bits are used only within the
+      IndexAllocate-, and -IndexDeallocate-PDUs.
+    - The INSTANCE_REGISTRATION bit is used only within the Register-PDU.
+
+* <reserved> = 0
+
+* sessionID. Uniquely identifies a session over which PDUs are exchanged
+  between a subagent and the master agent.
+  (1) The session ID has no significance in the Open-PDU sent by a subagent
+      to open a session with the master agent; in this case, the master
+      agent will assign a unique session ID that it will pass back in the
+      corresponding Response-PDU. From that point on, that same session ID
+      will appear in every PDU exchanged over that session between the
+      master and the subagent.
+  (2) A subagent may establish multiple AgentX sessions by sending multiple
+      Open-PDUs to the master agent.
+
+* transactionID. Uniquely identifies, for a given session, the single SNMP
+  management request (and single SNMP PDU) with which an AgentX PDU is
+  associated. If a single SNMP management request results in multiple AgentX
+  PDUs being sent by the master agent with the same session ID, each of
+  these AgentX PDUs must contain the same transaction ID; conversely, AgentX
+  PDUs sent during a particular session, that result from distinct SNMP
+  management requests, must have distinct transaction IDs (within the limits
+  of the 32-bit field). The transaction ID has no significance in AgentX
+  administrative PDUs, i.e. PDUs that are not associated with an SNMP
+  management request: Open-, Close-, Register-, Unregister-, Notify-, Ping-,
+  IndexAllocate-, IndexDeallocate-, AddAgentCaps-, and RemoveAgentCaps-PDUs.
+
+* packetID. Is generated by the sender for all PDUs except the Response-PDU.
+  In a Response-PDU, the packet ID must be the same as that in the received
+  PDU to which it is a response.
+  (1) A master agent might use this field to associate subagent response
+      PDUs with their corresponding request PDUs.
+  (2) A subagent might use this field to correlate responses to multiple
+      (batched) registrations.
+
+* payload_length. The size in octets of the PDU contents, excluding the 20-
+  byte header. This value will always be either 0, or a multiple of 4.
+
+PDU payload
+
+PDU payload consists of the following fields:
+
+* Context. Optional Octet String. May be present in the agentx-Register-,
+  UnRegister-, AddAgentCaps-, RemoveAgentCaps-, Get-, GetNext-, GetBulk-,
+  IndexAllocate-, IndexDeallocate-, Notify-, TestSet-, and Ping- PDUs.
+
+  If the NON_DEFAULT_CONTEXT bit in the PDU header field flags is clear,
+  then there is no context field in the PDU (this does not mean there is
+  a zero-length Octet String, it means there is no Octet String present).
+  If the NON_DEFAULT_CONTEXT bit is set, then a context field immediately
+  follows the header.
+
+* Payload Parameters. Contains data specific to each PDU type (see below).
+
+* Search Range List. A sequence of Search Rages. May be present in the
+  Get-, GetNext-, and GetBulk- PDUs.
+
+* Varbind List. A sequence of Varbinds. May be present in the TestSet-,
+  IndexAllocate-, IndexDeallocate-, and Response- PDUs.
+
+Open-PDU Parameters
+
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|   timeout     |                     <reserved>                |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+(id)
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|   nsubid      |  prefix       |       0       |  <reserved>   |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|             subidentifier #1                                  |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+...                                                             |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|             subidentifier #nsubid                             |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+(descr)
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                     Octet String Length (L)                   |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|  Octet 1      |  Octet 2      |   Octet 3     |   Octet 4     |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|  Octet L - 1  |  Octet L      |       Padding (as required)   |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* timeout. The length of time, in seconds, that a master agent should
+  allow to elapse after dispatching a message on a session before it
+  regards the subagent as not responding. This is the default value
+  for the session, and may be overridden by values associated with
+  specific registered MIB regions. The default value of 0 indicates
+  that there is no session-wide default value.
+
+* id. An Object Identifier that identifies the subagent. Subagents
+  that do not support such an notion may send a null Object Identifier.
+
+* descr. An Octet String containing a DisplayString describing the
+  subagent.
+
+Close-PDU Parameters
+
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|    reason     |                     <reserved>                |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* reason. An enumerated value that gives the reason that the master
+  agent or subagent closed the AgentX session. This field may take
+  one of the following values:
+
+  reasonOther         = 1. None of the following reasons.
+  reasonParseError    = 2. Too many AgentX parse errors from peer.
+  reasonProtocolError = 3. Too many AgentX protocol errors from peer.
+  reasonTimeouts      = 4. Too many timeouts waiting for peer.
+  reasonShutdown      = 5. Sending entity is shutting down.
+  reasonByManager     = 6. Due to Set operation; this reason code can
+                           be used only by the master agent, in
+                           response to an SNMP management request.
+
+Register-PDU Parameters
+
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|   timeout     |   priority    |  range_subid  |  <reserved>   |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+(subtree)
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|   nsubid      |  prefix       |      0        |  <reserved>   |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|             sub-identifier #1                                 |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|             sub-identifier #nsubid                            |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+(upper_bound)
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|             optional upper-bound sub-identifier               |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* timeout. The length of time, in seconds, that a master agent should
+  allow to elapse after dispatching a message on a session before it
+  regards the subagent as not responding. It applies only to messages
+  that concern MIB objects within subtree. It overrides both the
+  session's default value (if any) indicated when the AgentX session
+  with the master agent was established, and the master agent's default
+  timeout. The default value for timeout is 0 (no override).
+
+* priority. A value between 1 and 255, used to achieve a desired
+  configuration when different sessions register identical or
+  overlapping regions. Subagents with no particular knowledge of
+  priority should register with the default value of 127. In the
+  master agent's dispatching algorithm, smaller values of priority
+  take precedence over larger values.
+
+* subtree. An Object Identifier that names the basic subtree of a MIB
+  region for which a subagent indicates its support. The term
+  "subtree" is used generically here, it may represent a fully-qualified
+  instance name, a partial instance name, a MIB table, an entire MIB, etc.
+
+  Standard practice is for a subagent to register at the highest level
+  of the naming tree that makes sense. Registration of fully- qualified
+  instances is typically done only when a subagent can perform management
+  operations only on particular rows of a conceptual table.
+
+  If subtree is in fact a fully qualified instance name, the
+  INSTANCE_REGISTRATION bit in header's flags must be set, otherwise
+  it must be cleared.
+
+* range_subid. Permits specifying a range in place of one of subtree's
+  sub-identifiers. If this value is 0, no range is being specified and
+  there is no upper_bound field present in the parameters. In this case
+  the MIB region being registered is the single subtree named by subtree.
+  Otherwise the range_subid-th sub-identifier in subtree is a range lower
+  bound, and the range upper bound sub-identifier (upper_bound) immediately
+  follows subtree. In this case the MIB region being registered is the
+  union of the subtrees formed by enumerating this range.
+
+  Note that range_subid indicates the (1-based) index of this sub-
+  identifier within the OID represented by subtree, regardless of whether
+  or not subtree is encoded using a prefix (see the example below).
+
+* upper_bound. The upper bound of a sub-identifier's range. This field is
+  present only if range_subid is not 0. The use of range_subid and
+  upper_bound provide a general shorthand mechanism for specifying a MIB
+  region. E.g. if subtree is 1.3.6.1.2.1.2.2.1.1.7, range_subid is 10,
+  and upper_bound is 22, the specified MIB region can be denoted
+  1.3.6.1.2.1.2.2.1.[1-22].7.
+  
+  One expected use of this mechanism is registering a conceptual row with
+  a single PDU. In the example above, the MIB region happens to be row 7
+  of the RFC 1573 ifTable.
+
+  Note again that here r.range_subid is 10, even though n_subid in
+  subtree is only 6.
+
+Unregister-PDU Parameters
+
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|  <reserved>   |   priority    |  range_subid  |  <reserved>   |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+(subtree)
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|   nsubid      |  prefix       |      0        |  <reserved>   |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|             sub-identifier #1                                 |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|             sub-identifier #nsubid                            |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+(upper_bound)
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|             optional upper-bound sub-identifier               |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* priority. The priority at which this region was originally
+  registered.
+
+* subtree. Indicates a previously-registered region of the MIB
+  that a subagent no longer wishes to support.
+
+* range_subid. Indicates a sub-identifier in u.subtree is a
+  range lower bound.
+
+* upper_bound. The upper bound of the range sub-identifier. This
+  field is present in the PDU only if u.range_subid is not 0.
+
+GetBulk-PDU Parameters
+
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|          non_repeaters        |       max_repetitions         |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* non_repeaters. The number of variables in the SearchRangeList
+  that are not repeaters.
+
+* max_repetitions. The maximum number of repetitions requested
+  for repeating variables.
+
+AddAgentCaps-PDU Parameters
+
+id
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|    nsubid     |  prefix       |      0        |  <reserved>   |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|             sub-identifier #1                                 |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|             sub-identifier #nsubid                            |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+descr
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                     Octet String Length (L)                   |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|  Octet 1      |  Octet 2      |   Octet 3     |   Octet 4     |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|  Octet L - 1  |  Octet L      |       Optional Padding        |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* id. An Object Identifier containing the value of an invocation
+  of the AGENT-CAPABILITIES macro, which the master agent exports
+  as a value of sysORID for the indicated context. (Recall that
+  the value of an invocation of an AGENT-CAPABILITIES macro is an
+  object identifier that describes a precise level of support with
+  respect to implemented MIB modules. A more complete discussion
+  of the AGENT-CAPABILITIES macro and related sysORID values can
+  be found in section 6 of STD 58, RFC 2580 [7].)
+
+* descr. An Octet String containing a DisplayString to be used as
+  the value of sysORDescr corresponding to the sysORID value.
+
+RemoveAgentCaps-PDU Parameters
+
+id
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|    nsubid       |  prefix       |      0        |  <reserved>   |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|             sub-identifier #1                                 |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|             sub-identifier #nsubid                            |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* id. An ObjectIdentifier containing the value of sysORID that
+  should no longer be exported.
+
+Response-PDU Parameters
+
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                          sysUpTime                            |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|               error           |         index                 |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+* sysUpTime. Contains the current value of sysUpTime for the context
+  indicated within the PDU to which this PDU is a response. It is
+  relevant only in agentx response PDUs sent from the master agent to
+  a subagent in response to the set of administrative PDUs. In a
+  response PDU from the subagent to the master agent, the value of
+  sysUpTime has no significance and is ignored by the master agent.
+
+* res.error. Indicates error status. Within responses to the set of
+  "administrative" PDU types values are limited to the following:
+
+  noAgentXError         = 0
+  openFailed            = 256
+  notOpen               = 257
+  indexWrongType        = 258
+  indexAlreadyAllocated = 259
+  indexNoneAvailable    = 260
+  indexNotAllocated     = 261
+  unsupportedContext    = 262
+  duplicateRegistration = 263
+  unknownRegistration   = 264
+  unknownAgentCaps      = 265
+  parseError            = 266
+  requestDenied         = 267
+  processingError       = 268
+
+  Within responses to the set of "SNMP request processing" PDU values
+  may also include those defined for errors in the SNMPv2 PDU.
+
+* index. In error cases, this is the index of the failed varbind within
+  a received request PDU (the index values of varbinds within a varbind
+  list are 1-based). A VarBindList may follow index, depending on which
+  AgentX PDU is being responded to.
+
+
+ 
