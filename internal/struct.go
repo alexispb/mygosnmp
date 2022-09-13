@@ -20,6 +20,12 @@ func StructString(s interface{}, depth int) string {
 	return strings.Trim(sb.String(), "\n")
 }
 
+func StructsDiff(s1, s2 interface{}) string {
+	return StringsLinesDiff(
+		StructString(s1, 0),
+		StructString(s2, 0))
+}
+
 func tryFprintOrString(sb *strings.Builder, v reflect.Value) bool {
 	if method := v.MethodByName("Fprint"); method.IsValid() {
 		t := method.Type()
@@ -103,7 +109,7 @@ const (
 	diffmark2 = '\u2514'
 )
 
-func StringLinesDiff(s1, s2 string) string {
+func StringsLinesDiff(s1, s2 string) string {
 	if s1 == s2 {
 		return ""
 	}

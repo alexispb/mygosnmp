@@ -735,13 +735,9 @@ func TestPduEncoding(t *testing.T) {
 			} else if !DecodePduPayload(&pduDecoded, test.data[i][PduHeaderSize:]) {
 				t.Errorf("%sfailed to decode pdu payload",
 					testid)
-			} else {
-				str1 := internal.StructString(pdu, 0)
-				str2 := internal.StructString(pduDecoded, 0)
-				if diff := internal.StringLinesDiff(str1, str2); len(diff) != 0 {
-					t.Errorf("%sinvalid decoded pdu:\n%s",
-						testid, diff)
-				}
+			} else if diff := internal.StructsDiff(pdu, pduDecoded); len(diff) != 0 {
+				t.Errorf("%sinvalid decoded pdu:\n%s",
+					testid, diff)
 			}
 
 			data, ok = EncodePduDbg(pdu, lognone)
@@ -762,13 +758,9 @@ func TestPduEncoding(t *testing.T) {
 			} else if !DecodePduPayloadDbg(&pduDecoded, test.data[i][PduHeaderSize:], lognone) {
 				t.Errorf("%sfailed to debug-decode pdu payload",
 					testid)
-			} else {
-				str1 := internal.StructString(pdu, 0)
-				str2 := internal.StructString(pduDecoded, 0)
-				if diff := internal.StringLinesDiff(str1, str2); len(diff) != 0 {
-					t.Errorf("%sinvalid debug-decoded pdu:\n%s",
-						testid, diff)
-				}
+			} else if diff := internal.StructsDiff(pdu, pduDecoded); len(diff) != 0 {
+				t.Errorf("%sinvalid decoded-decoded pdu:\n%s",
+					testid, diff)
 			}
 		}
 	}
