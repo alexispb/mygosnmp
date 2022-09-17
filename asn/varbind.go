@@ -18,7 +18,7 @@ func (vb Varbind) Fprint(sb *strings.Builder) {
 	oid.Fprint(sb, vb.Oid)
 	sb.WriteByte(' ')
 	sb.WriteString(vb.Tag.String())
-	sb.WriteByte(':')
+	sb.WriteString(": ")
 	vb.Tag.Fprint(sb, vb.Value)
 	sb.WriteByte('}')
 }

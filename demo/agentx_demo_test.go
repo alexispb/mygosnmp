@@ -12,7 +12,7 @@ import (
 	"github.com/alexispb/mygosnmp/pduerror"
 )
 
-func init() { oid.MibName["myVar"] = []uint32{1, 3, 6, 1, 4, 1, 999, 1, 0} }
+func init() { oid.Name["myVar"] = []uint32{1, 3, 6, 1, 4, 1, 999, 1, 0} }
 
 func TestDemo(t *testing.T) {
 	log := logger.Console()
@@ -47,7 +47,7 @@ func runDemoMaster(port int, log logger.Log) {
 		pdu.Tag = agentx.TagGet
 		pdu.Params = agentx.NoParams{}
 		pdu.Ranges = []agentx.SearchRange{
-			{StartOid: oid.MibName["myVar"]},
+			{StartOid: oid.Name["myVar"]},
 		}
 		data, _ = agentx.EncodePdu(pdu)
 		conn.Write(data)
@@ -63,7 +63,7 @@ func runDemoMaster(port int, log logger.Log) {
 		pdu.Tag = agentx.TagGet
 		pdu.Params = agentx.NoParams{}
 		pdu.Ranges = []agentx.SearchRange{
-			{StartOid: oid.MibName["myVar"]},
+			{StartOid: oid.Name["myVar"]},
 		}
 		data, _ = agentx.EncodePdu(pdu)
 		// damage data: set reserve byte to non-zero value
@@ -145,7 +145,7 @@ func runDemoSubagent(port int, log logger.Log) (chanFinished chan struct{}) {
 				pdu.Tag = agentx.TagResponse
 				pdu.Params = agentx.ResponseParams{}
 				pdu.Varbinds = []asn.Varbind{
-					{Oid: oid.MibName["myVar"], Tag: asn.TagInteger32, Value: int32(123)},
+					{Oid: oid.Name["myVar"], Tag: asn.TagInteger32, Value: int32(123)},
 				}
 				pdu.Ranges = nil
 				log.Writef("Subagent. Sending response:\n%s\n",

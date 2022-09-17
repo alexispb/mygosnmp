@@ -1,7 +1,7 @@
 package oid
 
 // MibName maps mib name to []uint32
-var MibName = map[string][]uint32{
+var Name = map[string][]uint32{
 	"internet":     {1, 3, 6, 1},
 	"directory":    {1, 3, 6, 1, 1},
 	"mgmt":         {1, 3, 6, 1, 2},
