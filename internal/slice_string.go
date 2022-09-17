@@ -1,5 +1,6 @@
 package internal
 
+/*
 import (
 	"reflect"
 	"unsafe"
@@ -22,3 +23,4 @@ func SliceAsString(b []byte) (s string) {
 	hs.Len = hb.Len
 	return
 }
+*/

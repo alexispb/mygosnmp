@@ -5,7 +5,6 @@ import (
 
 	"github.com/alexispb/mygosnmp/generics"
 	"github.com/alexispb/mygosnmp/hex"
-	"github.com/alexispb/mygosnmp/internal"
 	"github.com/alexispb/mygosnmp/ipa"
 	"github.com/alexispb/mygosnmp/logger"
 	"github.com/alexispb/mygosnmp/oid"
@@ -134,7 +133,7 @@ func (e encoderDbg) appendOctetString(data []byte, val string) []byte {
 	e.log.Write("appending OctetString size")
 	data = e.appendInt32(data, int32(len(val)))
 	e.log.Write("appending OctetString bytes")
-	data = append(data, internal.StringAsSlice(val)...)
+	data = append(data, []byte(val)...)
 	e.log.Write(hex.DumpTail("    ", data, len(val)))
 	data = e.appendPaddingBytes(data)
 

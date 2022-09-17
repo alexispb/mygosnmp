@@ -17,5 +17,5 @@ func Prefix(depth int) string {
 	if depth >= maxdepth {
 		depth = maxdepth
 	}
-	return SliceAsString(maxprefix[:tabsize*depth])
+	return string(maxprefix[:tabsize*depth])
 }

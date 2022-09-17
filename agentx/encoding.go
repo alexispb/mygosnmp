@@ -2,8 +2,6 @@ package agentx
 
 import (
 	"errors"
-
-	"github.com/alexispb/mygosnmp/internal"
 )
 
 var ErrEncoding = errors.New("encoding error")
@@ -144,7 +142,7 @@ func octetStringEncodingSize(val string) int {
 
 func (e encoder) appendOctetString(data []byte, val string) []byte {
 	data = e.appendInt32(data, int32(len(val)))
-	data = append(data, internal.StringAsSlice(val)...)
+	data = append(data, []byte(val)...)
 	return e.appendPaddingBytes(data)
 }
 
